@@ -1,0 +1,74 @@
+               Universidad Modelo                                    Asignatura: Inteligencia artificial
+                       Escuela de Ingenierı́a                             Grupo: 5ºA Vespertino
+                  Ing. en Desarrollo de Tec. y Soft.                    Entrega: 29-sep-2025
+
+
+
+
+                   Proyecto #1: Algoritmos de regresión.1.4
+
+Objetivo
+   Aplicar diversas variantes del algoritmo de regresión en la solución de problemas de aprendizaje
+automático.
+
+
+Modalidad
+   Equipos.
+
+
+Instrucciones
+  1. En clase se estudió el algoritmo de entrenamiento “Batch Gradient Descent”. Investiga acerca
+     de las siguientes variantes: (a) Stochastic Gradient Descent y (b) Mini-batch Gradient Descent.
+     ¿Cuáles son las diferencias y las ventajas/desventajas entre las tres variantes? ¿Cuáles son las
+     condiciones bajo las cuales se prefieren aplicar cada una de ellas?
+
+  2. Implementa en Python los algoritmos (a) Stochastic Gradient Descent y (b) Mini-batch Gra-
+     dient Descent, en la solución de un problema de “nube de puntos artificial”siendo de particular
+     interés la gráfica de la función costo vs. iteraciones. Comparar las soluciones con las obtenidas
+     previamente en clase.
+
+  3. Investiga acerca de la importancia del escalamiento de los features en los algoritmos de apren-
+     dizaje automático, y como afecta éste su rendimiento. Explica la definición matemática de la
+     normalización y la estandarización, aplicando las fórmulas a un conjunto de datos de ejemplo.
+
+  4. Implementa en Python métodos para la normalización y estandarización de un conjunto de
+     datos sin usar librerı́as externas; aplica ambas a una dataset pequeño (puede ser generado
+     artificialmente). Utiliza los métodos de librerı́a MinMaxScaler y StandardScaler en el mismo
+     dataset pequeño y compara los resultados obtenidos con los de la implementación propia.
+
+
+Entrega en salón
+   Consiste en:
+
+   ▷ Demostrar que la entrega cumple con los requisitos de diseño y funcionalidad solicitados..
+   ▷ Responder las preguntas de evaluación durante demostración.
+   ▷ La evaluación es a nivel individual.
+
+18/septiembre/2025              Prof: Edson G. Estrada López, M.C.                               1 de 2
+             Universidad Modelo                                    Asignatura: Inteligencia artificial
+                       Escuela de Ingenierı́a                            Grupo: 5ºA Vespertino
+                 Ing. en Desarrollo de Tec. y Soft.                     Entrega: 29-sep-2025
+
+
+
+Entrega digital
+Contenido
+   Un solo archivo comprimido ZIP, RAR o 7Z que debe incluir:
+
+  1. Documento (presentación) en formato PDF.
+  2. Archivos de Jupyter Notebook (*.ipynb).
+
+Nomenclatura de archivo
+   Proyecto 1 - Apellido1 Apellido2 Apellido3 Apellido4.zip (.rar o .7z)
+
+Rúbrica de evaluación
+   Reporte digital 1 (presentación).
+
+Notas
+   ▷ Para iniciar la evaluación todos los integrantes del equipo deben estar presentes.
+   ▷ Revisa los requisitos de la entrega digital en la presentación del primer dı́a de clases.
+
+
+
+
+18/septiembre/2025             Prof: Edson G. Estrada López, M.C.                                2 de 2

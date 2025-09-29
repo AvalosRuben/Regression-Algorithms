@@ -1,0 +1,874 @@
+===============================================================================
+                    EXPLICACIÓN DETALLADA DEL ALGORITMO MINI-BATCH GRADIENT DESCENT
+                              Análisis Línea por Línea - Paso a Paso
+===============================================================================
+
+AUTOR: Análisis para Proyecto #1 - Algoritmos de Regresión
+FECHA: 28 de Septiembre, 2025
+CURSO: Inteligencia Artificial - Universidad Modelo
+
+===============================================================================
+                                    ÍNDICE
+===============================================================================
+
+1. IMPORTACIÓN DE LIBRERÍAS Y CONFIGURACIÓN INICIAL
+2. GENERACIÓN DE DATOS ARTIFICIALES (NUBE DE PUNTOS)
+3. FUNCIONES DE COSTO Y GRADIENTE
+4. IMPLEMENTACIÓN DEL ALGORITMO MINI-BATCH GRADIENT DESCENT
+5. ALGORITMOS DE COMPARACIÓN (BATCH GD Y STOCHASTIC GD)
+6. ENTRENAMIENTO Y ANÁLISIS COMPARATIVO
+7. ANÁLISIS DE HIPERPARÁMETROS
+8. PROBLEMAS COMUNES Y SOLUCIONES
+9. RECOMENDACIONES Y MEJORES PRÁCTICAS
+
+===============================================================================
+1. IMPORTACIÓN DE LIBRERÍAS Y CONFIGURACIÓN INICIAL
+===============================================================================
+
+LÍNEAS 40-46:
+```python
+import numpy as np
+import matplotlib.pyplot as plt
+from sklearn.preprocessing import StandardScaler
+import time
+import warnings
+warnings.filterwarnings('ignore')
+```
+
+EXPLICACIÓN LÍNEA POR LÍNEA:
+
+• import numpy as np
+  └─ QUE HACE: Importa NumPy para operaciones matemáticas vectorizadas
+  └─ POR QUÉ ESTÁ: NumPy es FUNDAMENTAL para operaciones con matrices y vectores
+     - Multiplicación matricial: X.dot(theta)
+     - Operaciones elemento por elemento: (predictions - y)**2
+     - Funciones matemáticas: np.random.randn(), np.sum(), etc.
+  └─ QUE PASA SI LO CAMBIAS/QUITAS:
+     ❌ SIN NUMPY: El código NO funcionará - todas las operaciones matriciales fallarán
+     ❌ USAR LISTAS DE PYTHON: 100x más lento, código más complejo
+  └─ PROBLEMAS POTENCIALES:
+     - Versión incompatible de NumPy puede causar errores
+     - Sin NumPy: TypeError en operaciones matriciales
+
+• import matplotlib.pyplot as plt  
+  └─ QUE HACE: Importa Matplotlib para crear gráficos
+  └─ POR QUÉ ESTÁ: Necesario para visualizar:
+     - Nube de puntos original
+     - Función de costo vs iteraciones
+     - Comparación entre algoritmos
+     - Ajuste de la línea de regresión
+  └─ QUE PASA SI LO CAMBIAS/QUITAS:
+     ❌ SIN MATPLOTLIB: No se mostrarán gráficos (plt.show() fallará)
+     ✅ ALTERNATIVAS: seaborn, plotly (requieren cambios de sintaxis)
+  └─ PROBLEMAS POTENCIALES:
+     - Backend no configurado: puede no mostrar gráficos
+     - Memoria insuficiente para gráficos grandes
+
+• from sklearn.preprocessing import StandardScaler
+  └─ QUE HACE: Importa herramientas para normalización de datos
+  └─ POR QUÉ ESTÁ: Para comparar implementación propia vs librería
+  └─ QUE PASA SI LO CAMBIAS/QUITAS:
+     ❌ SIN SKLEARN: No podrás usar StandardScaler (pero el algoritmo principal sí funciona)
+     ✅ ALTERNATIVA: Implementar normalización manualmente
+  └─ PROBLEMAS POTENCIALES:
+     - Sklearn no instalado: ImportError
+     - Versión incompatible puede cambiar API
+
+• import time
+  └─ QUE HACE: Importa funciones para medir tiempo de ejecución
+  └─ POR QUÉ ESTÁ: Para comparar velocidad entre algoritmos
+  └─ QUE PASA SI LO QUITAS:
+     ❌ ERROR: time.time() fallará en las funciones de entrenamiento
+  └─ PROBLEMAS POTENCIALES: Ninguno, es librería estándar
+
+• warnings.filterwarnings('ignore')
+  └─ QUE HACE: Suprime advertencias de librerías
+  └─ POR QUÉ ESTÁ: Para output más limpio (evita warnings de sklearn/numpy)
+  └─ QUE PASA SI LO CAMBIAS:
+     ⚠️ QUITAR: Mostrarán warnings (no afecta funcionalidad)
+     ✅ 'default': Muestra advertencias importantes
+  └─ PROBLEMAS POTENCIALES:
+     - Puede ocultar advertencias importantes
+     - En producción, mejor manejar warnings específicos
+
+===============================================================================
+2. GENERACIÓN DE DATOS ARTIFICIALES (NUBE DE PUNTOS)
+===============================================================================
+
+LÍNEAS 49-70:
+```python
+np.random.seed(42)
+m = 1000  # número de muestras
+X = 2 * np.random.rand(m, 1)  # feature
+y = 4 + 3 * X + np.random.randn(m, 1)  # target con ruido
+X_b = np.c_[np.ones((m, 1)), X]  # forma (m, 2)
+```
+
+EXPLICACIÓN LÍNEA POR LÍNEA:
+
+• np.random.seed(42)
+  └─ QUE HACE: Establece semilla para generar números aleatorios reproducibles
+  └─ POR QUÉ EL NÚMERO 42: Es arbitrario (referencia a "Guía del Autoestopista Galáctico")
+  └─ POR QUÉ ESTÁ: REPRODUCIBILIDAD - mismos resultados en cada ejecución
+  └─ QUE PASA SI LO CAMBIAS:
+     ✅ OTRO NÚMERO (0, 123, etc.): Diferentes datos, pero reproducibles
+     ❌ SIN SEED: Resultados diferentes cada vez - dificulta debugging
+     ⚠️ SEED DESPUÉS DE IMPORTS: Debe estar antes de generar datos
+  └─ PROBLEMAS POTENCIALES:
+     - Seed muy tarde: algunos datos ya generados aleatoriamente
+     - En producción: usar diferentes seeds para validación cruzada
+
+• m = 1000
+  └─ QUE HACE: Define número de muestras en el dataset
+  └─ POR QUÉ 1000: Balance entre:
+     - Suficientes datos para entrenamiento estable
+     - No demasiados para que sea rápido
+  └─ QUE PASA SI LO CAMBIAS:
+     ✅ m = 100: Más rápido, pero menos estable
+     ✅ m = 10000: Más estable, pero más lento
+     ❌ m = 10: Muy pocas muestras, resultados inestables
+     ❌ m = 0: Error - no se pueden crear matrices vacías
+  └─ PROBLEMAS POTENCIALES:
+     - m muy pequeño: underfitting, alta varianza
+     - m muy grande: lento, posible memory overflow
+     - m no entero: TypeError
+
+• X = 2 * np.random.rand(m, 1)
+  └─ QUE HACE: Genera features X uniformemente distribuidos en [0, 2]
+  └─ DESGLOSE:
+     - np.random.rand(m, 1): matriz m×1 con valores en [0, 1]
+     - 2 *: escala a [0, 2]
+     - .shape = (1000, 1): m filas, 1 columna (1 feature)
+  └─ POR QUÉ [0, 2]: Rango razonable para visualización
+  └─ QUE PASA SI LO CAMBIAS:
+     ✅ X = np.random.randn(m, 1): Distribución normal (centrada en 0)
+     ✅ X = 5 * np.random.rand(m, 1): Rango [0, 5]
+     ❌ X = np.random.rand(m): Forma incorrecta (vector 1D)
+  └─ PROBLEMAS POTENCIALES:
+     - Rango muy grande: problemas de escala en gradientes
+     - Forma incorrecta: errores en multiplicación matricial
+
+• y = 4 + 3 * X + np.random.randn(m, 1)
+  └─ QUE HACE: Genera variable objetivo con relación lineal y ruido
+  └─ DESGLOSE MATEMÁTICO:
+     - 4: intercepto (θ₀ real)
+     - 3: pendiente (θ₁ real)  
+     - 3 * X: componente determinística
+     - np.random.randn(m, 1): ruido gaussiano (μ=0, σ=1)
+     - ECUACIÓN REAL: y = 4 + 3x + ε, donde ε ~ N(0,1)
+  └─ POR QUÉ ESTOS VALORES:
+     - 4, 3: Fáciles de recordar para verificar si el algoritmo encuentra los valores correctos
+     - Ruido gaussiano: Simula datos del mundo real
+  └─ QUE PASA SI LO CAMBIAS:
+     ✅ y = 2 + 5*X + 0.5*np.random.randn(m, 1): Menos ruido
+     ✅ y = 1 + 2*X: Sin ruido (perfectamente lineal)
+     ❌ y = 4 + 3*X + 10*np.random.randn(m, 1): MUCHO ruido - difícil convergencia
+  └─ PROBLEMAS POTENCIALES:
+     - Ruido excesivo: el algoritmo no converge bien
+     - Sin ruido: sobreajuste, no realista
+     - Relación no lineal: algoritmo lineal no ajustará bien
+
+• X_b = np.c_[np.ones((m, 1)), X]
+  └─ QUE HACE: Añade columna de 1s para el término de sesgo (bias/intercepto)
+  └─ DESGLOSE:
+     - np.ones((m, 1)): vector columna de 1s (para θ₀)
+     - np.c_[...]: concatena horizontalmente
+     - Resultado: X_b.shape = (1000, 2)
+     - X_b = [1  x₁]  ← primera fila
+              [1  x₂]  ← segunda fila  
+              [⋮   ⋮]
+              [1  xₘ]  ← última fila
+  └─ POR QUÉ ES NECESARIO:
+     - Ecuación: y = θ₀ + θ₁*x = [1, x] · [θ₀, θ₁]ᵀ
+     - Sin columna de 1s: no hay término independiente
+  └─ QUE PASA SI LO CAMBIAS:
+     ❌ SIN COLUMNA DE 1s: La línea pasa por el origen (0,0)
+     ❌ np.c_[X, np.ones((m, 1))]: Orden incorrecto - θ₀ y θ₁ intercambiados
+     ✅ np.column_stack([np.ones((m, 1)), X]): Equivalente
+  └─ PROBLEMAS POTENCIALES:
+     - Olvidar columna de bias: modelo sesgado
+     - Orden incorrecto: interpretación errónea de parámetros
+
+===============================================================================
+3. FUNCIONES DE COSTO Y GRADIENTE
+===============================================================================
+
+LÍNEAS 72-89:
+
+def compute_cost(X, y, theta):
+    m = len(y)
+    predictions = X.dot(theta)
+    cost = (1/(2*m)) * np.sum((predictions - y)**2)
+    return cost
+
+EXPLICACIÓN LÍNEA POR LÍNEA:
+
+• def compute_cost(X, y, theta):
+  └─ QUE HACE: Define función para calcular Mean Squared Error (MSE)
+  └─ PARÁMETROS:
+     - X: matriz de features (m × n)
+     - y: vector objetivo (m × 1)
+     - theta: parámetros del modelo (n × 1)
+  └─ POR QUÉ ESTA FUNCIÓN:
+     - Centraliza cálculo de costo
+     - Reutilizable en diferentes algoritmos
+     - Facilita debugging
+
+• m = len(y)
+  └─ QUE HACE: Obtiene número de muestras
+  └─ POR QUÉ len(y) Y NO X.shape[0]:
+     - len(y) más intuitivo
+     - y siempre es vector
+     - X puede tener diferentes formas según contexto
+  └─ QUE PASA SI LO CAMBIAS:
+     ✅ m = X.shape[0]: Funcionalmente equivalente
+     ❌ m = X.shape[1]: ERROR - sería número de features
+  └─ PROBLEMAS POTENCIALES:
+     - Si X e y tienen diferentes números de filas: error en dot product
+
+• predictions = X.dot(theta)
+  └─ QUE HACE: Calcula predicciones usando multiplicación matricial
+  └─ MATEMÁTICA:
+     predictions = Xθ = [x₁₁ x₁₂] [θ₁] = [x₁₁θ₁ + x₁₂θ₂]
+                       [x₂₁ x₂₂] [θ₂]   [x₂₁θ₁ + x₂₂θ₂]
+                       [ ⋮   ⋮ ]        [      ⋮       ]
+  └─ POR QUÉ .dot() Y NO *:
+     - .dot(): multiplicación matricial
+     - *: multiplicación elemento por elemento
+  └─ QUE PASA SI LO CAMBIAS:
+     ❌ predictions = X * theta: ERROR de forma si no son compatibles
+     ✅ predictions = X @ theta: Equivalente (Python 3.5+)
+  └─ PROBLEMAS POTENCIALES:
+     - Dimensiones incompatibles: ValueError
+     - theta no es vector columna: resultado incorrecto
+
+• cost = (1/(2*m)) * np.sum((predictions - y)**2)
+  └─ QUE HACE: Calcula MSE usando la fórmula matemática
+  └─ DESGLOSE MATEMÁTICO:
+     - (predictions - y): errores de predicción
+     - **2: elevamos al cuadrado cada error
+     - np.sum(...): suma de errores cuadráticos
+     - 1/(2*m): normalización por número de muestras
+     - Factor 1/2: simplifica el cálculo del gradiente
+  └─ FÓRMULA MATEMÁTICA:
+     J(θ) = 1/(2m) × Σᵢ₌₁ᵐ (hθ(xᵢ) - yᵢ)²
+  └─ POR QUÉ 1/(2m) Y NO 1/m:
+     - 1/2: cuando derivamos, el 2 del exponente cancela el 1/2
+     - Simplifica cálculo de gradiente: ∂J/∂θ = 1/m × Xᵀ(Xθ - y)
+  └─ QUE PASA SI LO CAMBIAS:
+     ✅ cost = (1/m) * np.sum((predictions - y)**2): MSE estándar (sin 1/2)
+     ❌ cost = np.sum((predictions - y)**2): Sin normalización - sesgado por tamaño
+     ⚠️ cost = np.mean((predictions - y)**2): Equivalente a MSE estándar
+  └─ PROBLEMAS POTENCIALES:
+     - División por cero si m = 0
+     - Overflow si errores muy grandes
+     - Underflow si errores muy pequeños
+
+def compute_gradient(X, y, theta, batch_size=None):
+    m = len(y) if batch_size is None else batch_size
+    predictions = X.dot(theta)  
+    gradient = (1/m) * X.T.dot(predictions - y)
+    return gradient
+
+• def compute_gradient(X, y, theta, batch_size=None):
+  └─ QUE HACE: Calcula gradiente de la función de costo
+  └─ PARÁMETROS:
+     - batch_size=None: usa todos los datos si no se especifica
+  └─ POR QUÉ BATCH_SIZE OPCIONAL:
+     - Flexibilidad para diferentes tamaños de batch
+     - Mismo código para Batch, Mini-batch y SGD
+
+• m = len(y) if batch_size is None else batch_size
+  └─ QUE HACE: Determina tamaño efectivo para normalización
+  └─ LÓGICA:
+     - Si batch_size=None: usa todos los datos (len(y))
+     - Si batch_size especificado: usa ese valor
+  └─ POR QUÉ ES IMPORTANTE:
+     - Batch GD: m = total de muestras  
+     - Mini-batch GD: m = tamaño del batch
+     - SGD: m = 1
+  └─ QUE PASA SI LO CAMBIAS:
+     ❌ m = len(y): Siempre usa total - gradiente incorrecto para mini-batches
+     ❌ m = batch_size: Error si batch_size=None
+  └─ PROBLEMAS POTENCIALES:
+     - batch_size > len(y): sesgo en normalización
+     - batch_size = 0: división por cero
+
+• gradient = (1/m) * X.T.dot(predictions - y)
+  └─ QUE HACE: Calcula gradiente usando fórmula matemática
+  └─ DESGLOSE:
+     - (predictions - y): vector de errores
+     - X.T: transpuesta de X (n × m)
+     - X.T.dot(...): suma ponderada de errores
+     - (1/m): normalización
+  └─ MATEMÁTICA:
+     ∇J(θ) = 1/m × Xᵀ(Xθ - y)
+     
+     Para cada parámetro:
+     ∂J/∂θⱼ = 1/m × Σᵢ₌₁ᵐ (hθ(xᵢ) - yᵢ) × xᵢⱼ
+  
+  └─ POR QUÉ X.T (TRANSPUESTA):
+     - X: m × n, (predictions - y): m × 1
+     - X.T: n × m, permite multiplicación matricial
+     - Resultado: n × 1 (un gradiente por cada parámetro)
+  └─ QUE PASA SI LO CAMBIAS:
+     ❌ gradient = (1/m) * X.dot(predictions - y): ERROR de dimensiones
+     ❌ Sin (1/m): gradiente no normalizado - pasos muy grandes
+  └─ PROBLEMAS POTENCIALES:
+     - Overflow si errores muy grandes
+     - Underflow si características muy pequeñas
+
+===============================================================================
+4. IMPLEMENTACIÓN DEL ALGORITMO MINI-BATCH GRADIENT DESCENT
+===============================================================================
+
+LÍNEAS 92-134:
+
+def mini_batch_gradient_descent(X, y, learning_rate=0.01, n_iterations=1000, batch_size=32, random_state=42):
+
+EXPLICACIÓN DE PARÁMETROS:
+
+• learning_rate=0.01
+  └─ QUE HACE: Controla el tamaño del paso en cada actualización
+  └─ POR QUÉ 0.01:
+     - Valor típico que funciona bien en muchos casos
+     - No muy grande (inestabilidad) ni muy pequeño (lento)
+  └─ RANGO TÍPICO: [0.001, 0.1]
+  └─ QUE PASA SI LO CAMBIAS:
+     ✅ 0.1: Converge más rápido, pero puede ser inestable
+     ✅ 0.001: Más estable, pero converge lentamente
+     ❌ 1.0: Probable divergencia o oscilación
+     ❌ 0: No aprende nada
+  └─ PROBLEMAS POTENCIALES:
+     - Muy alto: divergencia, gradiente exploding
+     - Muy bajo: convergencia lenta, puede quedarse en plateau
+     - Negativo: se aleja del mínimo
+
+• n_iterations=1000  
+  └─ QUE HACE: Número de épocas de entrenamiento
+  └─ QUÉ ES UNA ÉPOCA: Una pasada completa por todo el dataset
+  └─ POR QUÉ 1000: Balance entre convergencia y tiempo de cómputo
+  └─ QUE PASA SI LO CAMBIAS:
+     ✅ 100: Más rápido, puede no converger completamente
+     ✅ 5000: Más tiempo, mejor convergencia
+     ❌ 10: Muy pocas iteraciones - no aprende
+     ❌ 0: No entrena
+  └─ PROBLEMAS POTENCIALES:
+     - Muy pocas: underfitting
+     - Demasiadas: overfitting, tiempo excesivo
+
+• batch_size=32
+  └─ QUE HACE: Número de muestras procesadas en cada mini-batch
+  └─ POR QUÉ 32: Potencia de 2, buen balance velocidad/estabilidad
+  └─ VALORES TÍPICOS: 8, 16, 32, 64, 128, 256
+  └─ QUE PASA SI LO CAMBIAS:
+     ✅ 1: Se convierte en Stochastic GD
+     ✅ len(X): Se convierte en Batch GD
+     ✅ 64: Más estable, pero requiere más memoria
+     ❌ > len(X): Usa todos los datos (como Batch GD)
+     ❌ 0: División por cero
+  └─ PROBLEMAS POTENCIALES:
+     - Muy pequeño: convergencia ruidosa
+     - Muy grande: convergencia lenta, alta memoria
+
+EXPLICACIÓN DEL ALGORITMO PASO A PASO:
+
+    np.random.seed(random_state)
+    m, n = X.shape  
+    theta = np.random.randn(n, 1)
+
+• np.random.seed(random_state)
+  └─ QUE HACE: Asegura reproducibilidad dentro de la función
+  └─ POR QUÉ AQUÍ: Controla inicialización de θ y barajeo de datos
+  └─ PROBLEMAS POTENCIALES: Sin seed, resultados diferentes cada vez
+
+• m, n = X.shape
+  └─ QUE HACE: Extrae dimensiones de la matriz de features
+  └─ m: número de muestras
+  └─ n: número de features (incluyendo bias)
+  └─ EJEMPLO: Para X_b shape=(1000, 2) → m=1000, n=2
+
+• theta = np.random.randn(n, 1)
+  └─ QUE HACE: Inicializa parámetros aleatoriamente
+  └─ POR QUÉ ALEATORIO: Rompe simetría, evita que todos los parámetros sean iguales
+  └─ np.random.randn: distribución normal estándar N(0,1)
+  └─ FORMA: (n, 1) - vector columna
+  └─ QUE PASA SI LO CAMBIAS:
+     ❌ theta = np.zeros((n, 1)): Puede funcionar para regresión lineal, pero problemático para redes neuronales
+     ❌ theta = np.ones((n, 1)): Inicialización sesgada
+     ✅ theta = np.random.randn(n, 1) * 0.1: Inicialización más pequeña
+  └─ PROBLEMAS POTENCIALES:
+     - Valores muy grandes: gradiente exploding
+     - Todos iguales: simetría, aprende lentamente
+
+    for epoch in range(n_iterations):
+        # Barajar los datos al inicio de cada época
+        indices = np.random.permutation(m)
+        X_shuffled = X[indices]
+        y_shuffled = y[indices]
+
+• for epoch in range(n_iterations):
+  └─ QUE HACE: Bucle principal de entrenamiento
+  └─ CADA ITERACIÓN: una época completa
+
+• indices = np.random.permutation(m)  
+  └─ QUE HACE: Genera permutación aleatoria de índices [0, 1, ..., m-1]
+  └─ EJEMPLO: [0,1,2,3,4] → [3,1,4,0,2]
+  └─ POR QUÉ BARAJAR:
+     - Evita sesgos por orden de los datos
+     - Mejora convergencia
+     - Simula muestreo aleatorio
+  └─ QUE PASA SIN BARAJAR:
+     - Convergencia más lenta
+     - Posible sesgo si datos están ordenados
+     - Oscilaciones en función de costo
+
+• X_shuffled = X[indices]
+  Y_shuffled = y[indices]
+  └─ QUE HACE: Reordena datos según índices aleatorios
+  └─ MANTIENE CORRESPONDENCIA: X_shuffled[i] corresponde a y_shuffled[i]
+  └─ POR QUÉ CREAR COPIAS: No modifica datos originales
+
+        # Procesar mini-batches
+        for i in range(0, m, batch_size):
+            # Obtener mini-batch
+            end_idx = min(i + batch_size, m)
+            X_batch = X_shuffled[i:end_idx]
+            y_batch = y_shuffled[i:end_idx]
+
+• for i in range(0, m, batch_size):
+  └─ QUE HACE: Itera sobre mini-batches con step=batch_size
+  └─ EJEMPLO: m=1000, batch_size=32
+     - i = 0, 32, 64, ..., 992
+     - Procesa 32 muestras en cada iteración
+
+• end_idx = min(i + batch_size, m)
+  └─ QUE HACE: Asegura que no nos salgamos del rango de datos
+  └─ POR QUÉ min(): El último batch puede ser más pequeño
+  └─ EJEMPLO: m=1000, batch_size=32, i=992
+     - i + batch_size = 1024
+     - min(1024, 1000) = 1000
+     - Último batch: índices 992-1000 (8 muestras)
+
+• X_batch = X_shuffled[i:end_idx]
+  y_batch = y_shuffled[i:end_idx]
+  └─ QUE HACE: Extrae mini-batch actual
+  └─ SLICING: [i:end_idx] toma elementos desde i hasta end_idx-1
+
+            # Calcular gradiente para el mini-batch
+            gradient = compute_gradient(X_batch, y_batch, theta, len(X_batch))
+            
+            # Actualizar parámetros
+            theta = theta - learning_rate * gradient
+
+• gradient = compute_gradient(X_batch, y_batch, theta, len(X_batch))
+  └─ QUE HACE: Calcula gradiente solo para el mini-batch actual
+  └─ len(X_batch): tamaño real del batch (importante para último batch)
+  └─ DIFERENCIA CON BATCH GD: usa solo subset de datos
+
+• theta = theta - learning_rate * gradient  
+  └─ QUE HACE: Actualiza parámetros en dirección opuesta al gradiente
+  └─ REGLA DE ACTUALIZACIÓN: θ := θ - α∇J(θ)
+  └─ POR QUÉ RESTAR: gradiente apunta hacia máximo, queremos mínimo
+  └─ MATEMÁTICA:
+     θⱼ := θⱼ - α × (1/batch_size) × Σᵢ∈batch(hθ(xᵢ) - yᵢ) × xᵢⱼ
+
+        # Calcular y almacenar el costo de toda la época
+        cost = compute_cost(X, y, theta)
+        cost_history.append(cost)
+
+• cost = compute_cost(X, y, theta)
+  └─ QUE HACE: Calcula costo usando TODOS los datos
+  └─ POR QUÉ TODOS LOS DATOS Y NO SOLO EL BATCH:
+     - Monitoreo consistente de progreso
+     - Comparación justa entre épocas
+     - Detección de overfitting
+  └─ COSTO COMPUTACIONAL: O(m) por época
+  └─ ALTERNATIVA: Calcular solo cada N épocas para eficiencia
+
+• cost_history.append(cost)
+  └─ QUE HACE: Almacena historial para análisis y visualización
+  └─ PERMITE: Gráfico de convergencia, detección de problemas
+
+===============================================================================
+5. ALGORITMOS DE COMPARACIÓN (BATCH GD Y STOCHASTIC GD)  
+===============================================================================
+
+BATCH GRADIENT DESCENT:
+
+def batch_gradient_descent(X, y, learning_rate=0.01, n_iterations=1000, random_state=42):
+
+DIFERENCIAS CLAVE CON MINI-BATCH:
+
+• gradient = compute_gradient(X, y, theta)
+  └─ USA TODOS LOS DATOS en cada iteración
+  └─ NO HAY loop interno de batches
+  └─ VENTAJAS:
+     - Convergencia suave
+     - Gradiente exacto  
+     - Fácil de implementar
+  └─ DESVENTAJAS:
+     - Lento para datasets grandes
+     - Alto uso de memoria
+     - Puede quedarse en mínimos locales
+
+STOCHASTIC GRADIENT DESCENT:
+
+def stochastic_gradient_descent(X, y, learning_rate=0.01, n_iterations=1000, random_state=42):
+
+DIFERENCIAS CLAVE:
+
+    for epoch in range(n_iterations):
+        indices = np.random.permutation(m)
+        for i in indices:
+            X_i = X[i:i+1]  # UNA SOLA MUESTRA
+            y_i = y[i:i+1]
+            gradient = compute_gradient(X_i, y_i, theta, 1)
+            theta = theta - learning_rate * gradient
+
+• X_i = X[i:i+1]
+  └─ QUE HACE: Toma UNA sola muestra (pero mantiene forma matricial)
+  └─ POR QUÉ [i:i+1] Y NO [i]: Mantiene dimensión (1,n) en lugar de (n,)
+  └─ BATCH_SIZE = 1
+
+• for i in indices:
+  └─ ACTUALIZA PARÁMETROS para cada muestra individual
+  └─ m actualizaciones por época (vs 1 en Batch GD)
+  
+COMPARACIÓN VISUAL:
+- BATCH GD: ████████████ (una actualización grande)
+- MINI-BATCH: ████ ████ ████ (pocas actualizaciones medianas)  
+- SGD: █ █ █ █ █ █ █ █ █ █ (muchas actualizaciones pequeñas)
+
+===============================================================================
+6. ANÁLISIS DE PROBLEMAS COMUNES Y SOLUCIONES
+===============================================================================
+
+PROBLEMA 1: DIVERGENCIA (Cost aumenta en lugar de disminuir)
+
+CAUSAS:
+• Learning rate muy alto
+• Gradiente exploding
+• Datos mal escalados
+• Inicialización pobre
+
+SÍNTOMAS:
+- cost_history muestra valores crecientes
+- Valores de theta se vuelven muy grandes
+- NaN o Inf en cálculos
+
+SOLUCIONES:
+✅ Reducir learning_rate (dividir por 10)
+✅ Normalizar/estandarizar datos
+✅ Usar gradient clipping
+✅ Mejor inicialización (Xavier, He)
+
+CÓDIGO DE DIAGNÓSTICO:
+```python
+if cost > prev_cost * 1.1:  # Cost aumentó 10%
+    print("⚠️ POSIBLE DIVERGENCIA")
+    learning_rate *= 0.5  # Reducir learning rate
+```
+
+PROBLEMA 2: CONVERGENCIA LENTA
+
+CAUSAS:
+• Learning rate muy bajo  
+• Features con diferentes escalas
+• Inicialización cerca de saddle point
+• Batch size inadecuado
+
+SÍNTOMAS:
+- cost_history disminuye muy lentamente
+- Plateau en función de costo
+- Muchas iteraciones sin mejora
+
+SOLUCIONES:
+✅ Aumentar learning_rate gradualmente
+✅ Feature scaling/normalization
+✅ Adaptive learning rates (Adam, AdaGrad)
+✅ Momentum
+
+PROBLEMA 3: OVERFITTING
+
+CAUSAS:
+• Demasiadas iteraciones
+• Learning rate alto con muchas épocas
+• Modelo muy complejo para datos
+
+SÍNTOMAS:
+- Training cost sigue bajando
+- Validation cost comienza a subir
+- Gran diferencia entre train/val
+
+SOLUCIONES:  
+✅ Early stopping
+✅ Regularización (L1, L2)
+✅ Validación cruzada
+✅ Menos iteraciones
+
+PROBLEMA 4: BATCH SIZE ISSUES
+
+BATCH SIZE MUY PEQUEÑO (≤8):
+• Convergencia muy ruidosa
+• Ineficiente computacionalmente
+• Dificulta paralelización
+
+BATCH SIZE MUY GRANDE (>512):
+• Convergencia lenta
+• Alto uso de memoria
+• Puede quedarse en mínimos locales
+
+BATCH SIZE ÓPTIMO:
+• Hardware: múltiplo de 32 (GPUs)
+• Dataset pequeño: 16-32
+• Dataset grande: 64-256
+• Regla general: √m (raíz del número de muestras)
+
+PROBLEMA 5: NUMERICAL INSTABILITY
+
+CAUSAS:
+• Valores muy grandes en X o y
+• Underflow/overflow en cálculos
+• Mal condicionamiento de matriz
+
+SÍNTOMAS:
+- NaN o Inf en resultados
+- Warnings de overflow
+- Resultados inconsistentes
+
+SOLUCIONES:
+✅ Feature scaling obligatorio
+✅ Usar np.float64 en lugar de float32
+✅ Gradient clipping
+✅ Regularización
+
+===============================================================================
+7. RECOMENDACIONES Y MEJORES PRÁCTICAS
+===============================================================================
+
+SELECCIÓN DE HIPERPARÁMETROS:
+
+LEARNING RATE:
+┌─────────────────┬──────────────┬─────────────────┐
+│ Tipo Dataset    │ Learning Rate │ Notas           │
+├─────────────────┼──────────────┼─────────────────┤
+│ Pequeño (<1K)   │ 0.01 - 0.1   │ Puede ser alto  │
+│ Mediano (1K-100K)│ 0.001 - 0.01 │ Balance típico  │
+│ Grande (>100K)  │ 0.0001-0.001 │ Más conservador │
+└─────────────────┴──────────────┴─────────────────┘
+
+BATCH SIZE:
+┌──────────────────┬─────────────┬──────────────────┐
+│ Memoria/Hardware │ Batch Size  │ Características  │
+├──────────────────┼─────────────┼──────────────────┤
+│ CPU limitado     │ 8 - 32      │ Menos memoria    │
+│ GPU estándar     │ 32 - 128    │ Balance óptimo   │
+│ GPU potente      │ 128 - 512   │ Máxima eficiencia│
+└──────────────────┴─────────────┴──────────────────┘
+
+NÚMERO DE ITERACIONES:
+• Usar early stopping en lugar de número fijo
+• Monitor validation loss
+• Parar si no hay mejora en 50-100 épocas
+
+PREPROCESSING OBLIGATORIO:
+```python
+# 1. Feature Scaling
+from sklearn.preprocessing import StandardScaler
+scaler = StandardScaler()
+X_scaled = scaler.fit_transform(X)
+
+# 2. Train/Validation Split  
+from sklearn.model_selection import train_test_split
+X_train, X_val, y_train, y_val = train_test_split(X, y, test_size=0.2)
+
+# 3. Monitoreo
+def train_with_validation(X_train, y_train, X_val, y_val):
+    train_costs, val_costs = [], []
+    for epoch in range(n_iterations):
+        # Entrenamiento...
+        train_cost = compute_cost(X_train, y_train, theta)
+        val_cost = compute_cost(X_val, y_val, theta) 
+        
+        train_costs.append(train_cost)
+        val_costs.append(val_cost)
+        
+        # Early stopping
+        if val_cost > min(val_costs) * 1.01:  # 1% tolerance
+            patience += 1
+            if patience > 50:
+                break
+```
+
+DEBUGGING CHECKLIST:
+
+✅ ANTES DE ENTRENAR:
+- [ ] Datos normalizados/estandarizados
+- [ ] Sin valores NaN o infinitos  
+- [ ] Shapes correctas (X: m×n, y: m×1, theta: n×1)
+- [ ] Learning rate razonable
+- [ ] Batch size válido
+
+✅ DURANTE EL ENTRENAMIENTO:
+- [ ] Cost disminuye generalmente
+- [ ] Theta no crece descontroladamente
+- [ ] Sin warnings de overflow
+- [ ] Tiempo de convergencia razonable
+
+✅ DESPUÉS DEL ENTRENAMIENTO:
+- [ ] Métricas finales razonables (R², MSE)
+- [ ] Predicciones visuales sensatas
+- [ ] Parámetros interpretables
+
+OPTIMIZACIONES AVANZADAS:
+
+1. ADAPTIVE LEARNING RATE:
+```python
+def adaptive_learning_rate(cost_history, learning_rate, patience=10):
+    if len(cost_history) > patience:
+        recent_costs = cost_history[-patience:]
+        if max(recent_costs) - min(recent_costs) < 1e-6:
+            learning_rate *= 0.5  # Reduce if plateau
+    return learning_rate
+```
+
+2. MOMENTUM:
+```python
+def mini_batch_with_momentum(X, y, learning_rate=0.01, momentum=0.9):
+    velocity = np.zeros_like(theta)
+    for epoch in range(n_iterations):
+        # ... calcular gradient ...
+        velocity = momentum * velocity + learning_rate * gradient
+        theta = theta - velocity
+```
+
+3. LEARNING RATE SCHEDULING:
+```python
+def learning_rate_schedule(epoch, initial_lr=0.01):
+    if epoch < 100:
+        return initial_lr
+    elif epoch < 200:
+        return initial_lr * 0.1
+    else:
+        return initial_lr * 0.01
+```
+
+===============================================================================
+8. CASOS DE USO Y CUÁNDO USAR CADA ALGORITMO
+===============================================================================
+
+BATCH GRADIENT DESCENT:
+✅ USAR CUANDO:
+- Dataset pequeño (< 10,000 muestras)
+- Precisión es crítica
+- Recursos computacionales abundantes
+- Función convexa garantizada
+
+❌ EVITAR CUANDO:
+- Dataset muy grande (> 100,000 muestras)  
+- Memoria limitada
+- Necesidad de entrenamiento rápido
+- Datos de streaming
+
+STOCHASTIC GRADIENT DESCENT:
+✅ USAR CUANDO:
+- Dataset muy grande (> 1M muestras)
+- Memoria muy limitada
+- Entrenamiento online/streaming
+- Necesidad de escapar mínimos locales
+
+❌ EVITAR CUANDO:
+- Necesidad de convergencia suave
+- Análisis de convergencia crítico
+- Funciones muy ruidosas
+- Hardware con buena paralelización
+
+MINI-BATCH GRADIENT DESCENT:
+✅ USAR CUANDO:
+- Dataset mediano a grande (1K - 1M muestras)
+- Hardware con GPU/paralelización
+- Balance velocidad-estabilidad importante
+- Mayoría de casos prácticos
+
+❌ EVITAR CUANDO:
+- Dataset extremadamente pequeño (< 100)
+- Memoria extremadamente limitada
+- Necesidad de máxima precisión
+
+TABLA COMPARATIVA:
+
+┌─────────────────┬────────────┬──────────────────┬─────────────────┐
+│ Algoritmo       │ Velocidad  │ Estabilidad      │ Uso de Memoria  │
+├─────────────────┼────────────┼──────────────────┼─────────────────┤
+│ Batch GD        │ Lento      │ Muy Alta         │ Alto            │
+│ Mini-Batch GD   │ Medio      │ Alta             │ Medio           │  
+│ Stochastic GD   │ Rápido     │ Baja             │ Bajo            │
+└─────────────────┴────────────┴──────────────────┴─────────────────┘
+
+===============================================================================
+9. EXTENSIONES Y MEJORAS FUTURAS
+===============================================================================
+
+ALGORITMOS AVANZADOS:
+• Adam (Adaptive Moment Estimation)
+• RMSprop (Root Mean Square Propagation)  
+• AdaGrad (Adaptive Gradient)
+• BFGS (Broyden–Fletcher–Goldfarb–Shanno)
+
+REGULARIZACIÓN:
+• L1 Regularization (Lasso)
+• L2 Regularization (Ridge)  
+• Elastic Net (L1 + L2)
+• Dropout (para redes neuronales)
+
+TÉCNICAS DE CONVERGENCIA:
+• Early Stopping
+• Learning Rate Decay
+• Cyclical Learning Rates
+• Warm Restarts
+
+PARALELIZACIÓN:
+• Data Parallelism
+• Model Parallelism
+• Asynchronous SGD
+• Federated Learning
+
+===============================================================================
+RESUMEN EJECUTIVO
+===============================================================================
+
+El algoritmo Mini-Batch Gradient Descent implementado:
+
+✅ CARACTERÍSTICAS CLAVE:
+- Procesa datos en lotes de tamaño configurable
+- Barajea datos en cada época para mejor convergencia
+- Incluye medición de tiempo y monitoreo de costo
+- Implementación vectorizada para eficiencia
+
+✅ PARÁMETROS CRÍTICOS:
+- learning_rate: 0.01 (ajustar según dataset)
+- batch_size: 32 (potencia de 2 para eficiencia)
+- n_iterations: monitorear convergencia
+
+✅ VENTAJAS IMPLEMENTADAS:
+- Balance óptimo velocidad/estabilidad  
+- Aprovecha vectorización de NumPy
+- Código modular y reutilizable
+- Comparación directa con otras variantes
+
+⚠️ CONSIDERACIONES IMPORTANTES:
+- Requiere feature scaling para óptimo rendimiento
+- Batch size debe ajustarse según memoria disponible
+- Learning rate crítico para convergencia
+- Monitoreo constante necesario para detectar problemas
+
+🎯 RESULTADO ESPERADO:
+Con los datos sintéticos (y = 4 + 3x + ruido), el algoritmo debe converger a:
+- θ₀ ≈ 4.0 (intercepto)  
+- θ₁ ≈ 3.0 (pendiente)
+- MSE < 1.0 (dependiendo del ruido)
+
+===============================================================================
+FIN DEL DOCUMENTO - EXPLICACIÓN COMPLETA MINI-BATCH GRADIENT DESCENT
+===============================================================================
